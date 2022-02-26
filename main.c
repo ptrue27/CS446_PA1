@@ -4,9 +4,12 @@
     2/25/22
 */
 
-#include <stdbool.h>
-#include <string.h>
+#include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdbool.h>
+#include <unistd.h>
+#include <limits.h>
 
 void promptUser(bool isBatch);
 void printError();
@@ -19,9 +22,29 @@ void launchProcesses(char *tokens[], int numTokens, bool isRedirect);
 void changeDirectories(char *tokens[], int numTokens);
 
 int main(int argc, char *argv[]){
-
+    bool batchmode = 0;
+    promptUser(batchmode);
 
     return 0;
+}
+
+void promptUser(bool batchmode){
+    if(!batchmode){
+        // print user
+        printf("%s", getenv("USER"));
+        // print machine
+        char hostname[HOST_NAME_MAX];
+        gethostname(hostname, sizeof(hostname));
+        printf("@%s", hostname);
+        // print cwd
+        char cwd[PATH_MAX];
+        getcwd(cwd, sizeof(cwd));
+        printf(":%s$ ", cwd);
+    }
+}
+
+void printError(){
+    printf("Shell Program Error Encountered");
 }
 
 int parseInput(char *input, char *splitWords[]){
