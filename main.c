@@ -11,8 +11,6 @@
 #include <unistd.h>
 #include <limits.h>
 
-bool exitShell = false;
-
 void promptUser(bool isBatch, FILE* batchFile);
 void printError();
 int parseInput(char *input, char *splitWords[]);
@@ -22,7 +20,10 @@ char getLetter(char *str, int index);
 bool exitProgram(char *tokens[], int numTokens);
 void launchProcesses(char *tokens[], int numTokens, bool isRedirect);
 void changeDirectories(char *tokens[], int numTokens);
-void printHelp();
+
+void batchRead(FILE* file);
+void printHelp(char *tokens[], int numTokens);
+void runShell(bool batchmode, FILE* batchFile);
 
 int main(int argc, char *argv[])
 {
@@ -43,27 +44,56 @@ int main(int argc, char *argv[])
         }
     }
     //Determine if a batch file was inputed with command line arguements
+
+    runShell(batchmode,baFile);
+    //use kill to exit
+
+    return 0;
+}
+
+//-------------------------------------------------------------------------
+void runShell(bool batchmode, FILE* batchFile)
+{
+    int splitWordsIndex;
+    char* splitWords[100];
+    char input[100];
+    bool exitShell = false;
+
     while (exitShell==false)
     {
-        promptUser(batchmode, baFile);
+        promptUser(batchmode, batchFile);
         if (batchmode==true)
         {
             //If it finds a batch file it will read it, then go to normal mode
             batchmode=false;
             printf("---Batch file finished, proceding to normal mode:---\n");
         }
+        else
+        {
+        for (int i = 0; input[i-1]!='\n';i++)
+        {
+            //This will read in all the arguements, whether it be just 'ls' or something like 'ls -a'
+            input[i]=getchar();
+        }
+            splitWordsIndex = parseInput(input,splitWords);
+        
+            //These two don'w work 100% right now, if you enter two arguements (help test)
+            //it will break them. I am gonna get it working, just had to take a break
+            exitShell = exitProgram(splitWords,splitWordsIndex);
+            printHelp(splitWords,splitWordsIndex);
+        }
     }
-    return 0;
+
 }
 
+//-------------------------------------------------------------------------
 void promptUser(bool batchmode, FILE* batchFile)
 {
     //Changed parameters so it can execute the batch mode in this function
     char str [100];
-    char* splitWords[100];
-    char test[]="exit\n";
-    char test2[]="Exit\n";
-    char test3[]="EXIT\n";
+
+    int splitWordsIndex;
+
     if(!batchmode){
         // print user
         printf("%s", getenv("USER"));
@@ -75,70 +105,93 @@ void promptUser(bool batchmode, FILE* batchFile)
         char cwd[PATH_MAX];
         getcwd(cwd, sizeof(cwd));
         printf(":%s$ ", cwd);
-        
-        //This will read in all the arguements, whether it be just 'ls' or something like 'ls -a'
-        for (int i = 0; str[i-1]!='\n';i++)
-        {
-            str[i]=getchar();
-        }
-        
-        //The two if statements maybe should go into a switch, i am unsure as to how we 
-        //will decide what command the user types, and such. I think a switch would work,
-        //however I am not sure if there is a better way to do it becuause we might end
-        //up with a ton of switch statements. I don't understand the instructions when it says
-        //"The shell should accept execvp() executable commands, such as ls (and ls -la) and clear.""
-        //I go to that website and don't understand any of it at the moment.
-
-        //this checks to see if 'exit' is typed to tell when they want to exit the program. Probably gonna need
-        //some changing because I think we need to use kill().
-        if (strcmp(str,test)==0 || strcmp(str,test2)==0 || strcmp(str,test3)==0)
-        {
-            exitShell=true;
-
-        }
-        if (strcmp(str,"help\n")==0 || strcmp(str,"Help\n")==0 || strcmp(str,"HELP\n")==0)
-        {
-            printHelp();
-        }
-
-
     }
 
     //if it is a batch file
     else
     {
-        char* cmd = NULL;
-        size_t length;
-        ssize_t reading;
-
-        //reads in batch file line by line, in the loop need to add executing the command
-        while ((reading = getline(&cmd,&length, batchFile)) != -1)
-        {
-            printf("%s\n",cmd);
-        }
-        
+        batchRead(batchFile);
     }
 }
 
-void printError(){
+void batchRead(FILE* file)
+{
+    char* cmd = NULL;
+    size_t length;
+    ssize_t reading;
+
+    //reads in batch file line by line, in the loop need to add executing the command
+    while ((reading = getline(&cmd,&length, file)) != -1)
+    {
+        printf("%s\n",cmd);
+    }
+}
+
+//-------------------------------------------------------------------------
+void printError()
+{
     printf("Shell Program Error Encountered");
 }
 
+//-------------------------------------------------------------------------
+//This confused me, all it does is chop up the input string into different words
 int parseInput(char *input, char *splitWords[]){
     int wordInd = 0;
     splitWords[0] = strtok(input, " ");
-    while(splitWords[wordInd] != NULL){
+    while(splitWords[wordInd] != NULL)
+    {
+        // printf(" %s\n",splitWords[wordInd]);//This is it displaying each word, kind of confusing
         splitWords[++wordInd] = strtok(NULL, " ");
     }
-
     return wordInd;
 }
 
-//start to help command, nothing really
-void printHelp()
+//-------------------------------------------------------------------------
+void printHelp(char *tokens[], int numTokens)
 {
-    printf("Helpful info:\n");
-    printf("***Type 'exit' to exit\n");
-    printf("***Type 'ls' to see all available files and folders in current directory\n");
-    printf("Other\n");
+    int x=0;
+    while (x <numTokens)
+    {
+        printf("%s",tokens[x]);
+        x++;
+    }   
+    if (strcmp(tokens[0],"help\n")==0 || strcmp(tokens[0],"Help\n")==0 || strcmp(tokens[0],"HELP\n")==0)
+    {
+        printf("\nhelp detected\n");
+        // if (numTokens > 1)
+        // {
+        //     printError();
+        //     printf("\nHelp command with other error\n");
+        // }
+        // else
+        // {
+            printf("Helpful info:\n");
+            printf("***Type 'exit' to exit\n");
+            printf("***Type 'ls' to see all available files and folders in current directory\n");
+            printf("Other\n");
+        // }
+    }
+}
+
+//-------------------------------------------------------------------------
+bool exitProgram(char *tokens[], int numTokens)
+{
+    if (strcmp(tokens[0],"exit\n")==0 || strcmp(tokens[0],"Exit\n")==0 || strcmp(tokens[0],"EXIT\n")==0)
+    {
+        printf("\nexit detected\n");
+        if (numTokens > 1)
+        {
+            printError();
+            printf("\nExit command with other error\n");
+            return false;
+        }
+        else
+        {
+            return true;
+        }
+    }
+    else
+    {
+        return false;
+    }
 }
