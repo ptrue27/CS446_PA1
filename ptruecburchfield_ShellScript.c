@@ -66,7 +66,10 @@ int main(int argc, char *argv[])
         // Get cmd string from input, exit program if end of batchfile
         if(fgets(cmd, STR_MAX, inputFile) == NULL){
             // exitProgram();
-            // batchmode=false;
+            break;
+            //For some reason I couldn't figure out, it only can handle two commands in the batch file.
+            //Sorry I couldn't get this figured out. You are welcome ot take a crack at it if youd like.
+            //I think maybe it has to do with it putting all commands in the file at once instead of line by line.
         }
         //This just displays whats in the file I believe
         if(batchmode){
@@ -82,6 +85,10 @@ int main(int argc, char *argv[])
         //This returns the file name for the special case if you do the copy
         //one file to another file
         executeCommand(cmd,&isRedirect,cmdTokens,cmdTokens,&isExit,numTokens,batchmode);
+        // if (batchmode)
+        // {
+        //     break;
+        // }
     }
     kill(getpid(),SIGUSR1);
 
@@ -111,7 +118,7 @@ void promptUser(bool batchmode)
 //-------------------------------------------------------------------------
 void printError()
 {
-    printf("\nShell Program Error Encountered\n");
+    printf("\nShell Program Error Encountered\n\n");
 }
 
 //-------------------------------------------------------------------------
@@ -229,8 +236,22 @@ void launchProcesses(char *tokens[], int numTokens, bool isRedirect, bool batch)
         {
             for (int i=1;i<numTokens;i++)
             {
-                tokens[i][strlen(tokens[0])] = '\0';
+                tokens[i][strlen(tokens[i])-1] = '\0';
             }
+        }
+    }
+    else
+    {
+        if (numTokens==1)
+        {
+            // tokens[0][strlen(tokens[0])-1] = '\0';
+        }
+        else
+        {
+            for (int i=1;i<numTokens;i++)
+            {
+                tokens[i][strlen(tokens[i])-1] = '\0';
+            }  
         }
     }
     char* args[3];
