@@ -9,9 +9,11 @@
 #include <string.h>
 #include <stdbool.h>
 #include <unistd.h>
-#include <limits.h>
 
-void promptUser(bool isBatch, FILE* batchFile);
+#define STR_MAX 128 // using this because <limits.h> is not allowed
+#define TOKEN_MAX 32
+
+void promptUser(bool isBatch);
 void printError();
 int parseInput(char *input, char *splitWords[]);
 char *redirectCommand(char *special, char *line, bool *isRedirect, char *tokens[], char *outputTokens[]);
@@ -21,109 +23,85 @@ bool exitProgram(char *tokens[], int numTokens);
 void launchProcesses(char *tokens[], int numTokens, bool isRedirect);
 void changeDirectories(char *tokens[], int numTokens);
 
-void batchRead(FILE* file);
 void printHelp(char *tokens[], int numTokens);
-void runShell(bool batchmode, FILE* batchFile);
 
 int main(int argc, char *argv[])
 {
-    bool batchmode;
-    FILE* baFile;
-    if (argc > 1)
-    {
-        //checks to see if command line arguement was used, and if so is it a file that exists
-        if (baFile = fopen(argv[1],"r"))
-        {
-            batchmode=1;
-            printf("---Batch Found and initiating---\n");
-        }
-        else
-        {
-            batchmode=0;
-            printf("-----EnteringNormal mode, no batch file found-----\n");
+    bool batchmode, isRedirect, isExit = false;
+
+    FILE* inputFile = NULL;
+    FILE* outFile = NULL;
+    FILE* redirectFile = NULL;
+
+    char cmd[STR_MAX];
+    char* cmdTokens[TOKEN_MAX];
+    int numTokens;
+
+    // Determine if a batch file was inputed with command line arguements
+    if(argc > 2){
+        printError();
+        return 1;
+    } 
+    else if(argc == 1){
+        batchmode = false;
+        inputFile = stdin;
+    } 
+    else{
+        if(inputFile = fopen(argv[1],"r")){
+            batchmode = true;
+        } 
+        else{
+            printError();
+            return 1;
         }
     }
-    //Determine if a batch file was inputed with command line arguements
+    
+    // Shell loop
+    while(!isExit)
+    {
+        promptUser(batchmode);
 
-    runShell(batchmode,baFile);
-    //use kill to exit
+        // Get cmd string from input, exit program if end of batchfile
+        if(fgets(cmd, STR_MAX, inputFile) == NULL){
+            // exitProgram();
+        }
+        if(batchmode){
+            puts(cmd);
+        }
+
+        // Parse cmd string into tokens
+        numTokens = parseInput(cmd, cmdTokens);
+        
+        // Execute command
+        // char outFileName[STR_MAX] = executeCommand(cmd, &isRedirect, char* tokens[], char* outputTokens[],  &isExit); need to figure out tokens vs. outputTokens
+            
+    
+    }
 
     return 0;
 }
 
-//-------------------------------------------------------------------------
-void runShell(bool batchmode, FILE* batchFile)
-{
-    int splitWordsIndex;
-    char* splitWords[100];
-    char input[100];
-    bool exitShell = false;
-
-    while (exitShell==false)
-    {
-        promptUser(batchmode, batchFile);
-        if (batchmode==true)
-        {
-            //If it finds a batch file it will read it, then go to normal mode
-            batchmode=false;
-            printf("---Batch file finished, proceding to normal mode:---\n");
-        }
-        else
-        {
-        for (int i = 0; input[i-1]!='\n';i++)
-        {
-            //This will read in all the arguements, whether it be just 'ls' or something like 'ls -a'
-            input[i]=getchar();
-        }
-            splitWordsIndex = parseInput(input,splitWords);
-        
-            //These two don'w work 100% right now, if you enter two arguements (help test)
+/*   MOVED runShell() FUNCTIONALITY TO main() but kept these here if you were working on it
+//These two don'w work 100% right now, if you enter two arguements (help test)
             //it will break them. I am gonna get it working, just had to take a break
             exitShell = exitProgram(splitWords,splitWordsIndex);
             printHelp(splitWords,splitWordsIndex);
-        }
-    }
-
-}
+*/
 
 //-------------------------------------------------------------------------
-void promptUser(bool batchmode, FILE* batchFile)
+void promptUser(bool batchmode)
 {
-    //Changed parameters so it can execute the batch mode in this function
-    char str [100];
-
-    int splitWordsIndex;
-
     if(!batchmode){
         // print user
         printf("%s", getenv("USER"));
         // print machine
-        char hostname[HOST_NAME_MAX];
+        char hostname[STR_MAX];
         gethostname(hostname, sizeof(hostname));
         printf("@%s", hostname);
         // print cwd
-        char cwd[PATH_MAX];
+        char cwd[STR_MAX];
         getcwd(cwd, sizeof(cwd));
         printf(":%s$ ", cwd);
-    }
-
-    //if it is a batch file
-    else
-    {
-        batchRead(batchFile);
-    }
-}
-
-void batchRead(FILE* file)
-{
-    char* cmd = NULL;
-    size_t length;
-    ssize_t reading;
-
-    //reads in batch file line by line, in the loop need to add executing the command
-    while ((reading = getline(&cmd,&length, file)) != -1)
-    {
-        printf("%s\n",cmd);
     }
 }
 
@@ -194,4 +172,32 @@ bool exitProgram(char *tokens[], int numTokens)
     {
         return false;
     }
+}
+
+// should be working but havent tested yet
+void changeDirectories(char *tokens[], int numTokens){
+    if(strcmp(tokens[0], "cd") == 0){
+        if(numTokens != 2){
+            printError();
+        } 
+        else{
+            chdir(tokens[1]);
+        }
+    }
+}
+
+
+// not finished
+char *executeCommand(char *cmd, bool *isRedirect, char* tokens[], char* outputTokens[],  bool *isExits){
+    char *command = strdup(cmd);
+    strcat(command, "\n");
+    char outFileName[STR_MAX] = "";
+
+    // Check if command is a redirect
+    if(strchr(command, '>') != NULL){
+        *isRedirect = true;
+        // return redirectCommand();
+    }
+    *isRedirect = false;
+
 }
