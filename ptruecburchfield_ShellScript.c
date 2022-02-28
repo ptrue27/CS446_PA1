@@ -136,10 +136,11 @@ void printHelp(char *tokens[], int numTokens)
         }
         else
         {
-            printf("Helpful info:\n");
-            printf("***Type 'exit' to exit\n");
-            printf("***Type 'ls' to see all available files and folders in current directory\n");
-            printf("***Other\n");
+            printf("\n\nhelp -prints this screen so you can see available shell commands.");
+            printf("\ncd -changes directories to specified path;if not given, defaults to home.");
+            printf("\nexit -closes the shell");
+            printf("\n[input] > [output] -pipes input file into output file");
+            printf("\nls -see all available files in current directory");
         }
     }
 }
@@ -183,7 +184,7 @@ void changeDirectories(char *tokens[], int numTokens){
 char *executeCommand(char *cmd, bool *isRedirect, char* tokens[], char* outputTokens[],  bool *isExits,int numTokens){
     char *command = strdup(cmd);
     char outFileName[STR_MAX] = "";
-
+    strcat(command, "\n");
     // Check if command is a redirect
     if(strchr(command, '>') != NULL){
         *isRedirect = true;
@@ -193,14 +194,30 @@ char *executeCommand(char *cmd, bool *isRedirect, char* tokens[], char* outputTo
     {
         *isRedirect = false;
     }
-    launchProcesses(&command,numTokens,isRedirect);
+    launchProcesses(tokens,numTokens,isRedirect);
     return "outputFile.txt";
 }
 
 
 void launchProcesses(char *tokens[], int numTokens, bool isRedirect)
 {
-    tokens[0][strlen(tokens[0])-1] = '\0';
+    if (numTokens == 1)
+    {
+        tokens[0][strlen(tokens[0])-1] = '\0';
+    }
+    else
+    {
+        for (int i=1;i<numTokens;i++)
+        {
+            tokens[i][strlen(tokens[0])] = '\0';
+        }
+    }
+    char* args[3];
+    args[0]="ls";
+    args[1]="-l";
+    args[2]=NULL;
+    
+    // tokens[0][strlen(tokens[0])-1] = '\0';
     pid_t childProc;
     int childStatus;
     pid_t childReturn;
