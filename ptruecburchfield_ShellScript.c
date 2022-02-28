@@ -1,5 +1,6 @@
 /*
     CS 466 Project 1 Part 2
+    Making our own shell program in C
     Parker True and Curtis Burchfield
     2/25/22
 */
@@ -18,10 +19,10 @@ void promptUser(bool isBatch);
 void printError();
 int parseInput(char *input, char *splitWords[]);
 char *redirectCommand(char *special, char *line, bool *isRedirect, char *tokens[], char *outputTokens[]);
-char *executeCommand(char *cmd, bool *isRedirect, char* tokens[], char* outputTokens[],  bool *isExits,int numTokens);
+char *executeCommand(char *cmd, bool *isRedirect, char* tokens[], char* outputTokens[],  bool *isExits,int numTokens, bool batch);
 char getLetter(char *str, int index);
 bool exitProgram(char *tokens[], int numTokens);
-void launchProcesses(char *tokens[], int numTokens, bool isRedirect);
+void launchProcesses(char *tokens[], int numTokens, bool isRedirect,bool batch);
 void changeDirectories(char *tokens[], int numTokens);
 
 void printHelp(char *tokens[], int numTokens);
@@ -65,8 +66,9 @@ int main(int argc, char *argv[])
         // Get cmd string from input, exit program if end of batchfile
         if(fgets(cmd, STR_MAX, inputFile) == NULL){
             // exitProgram();
-            printf("\nDOes htis execute\n");
+            // batchmode=false;
         }
+        //This just displays whats in the file I believe
         if(batchmode){
             puts(cmd);
         }
@@ -76,8 +78,13 @@ int main(int argc, char *argv[])
         
         printHelp(cmdTokens,numTokens);
         isExit=exitProgram(cmdTokens,numTokens);
-        executeCommand(cmd,&isRedirect,cmdTokens,cmdTokens,&isExit,numTokens);
+
+        //This returns the file name for the special case if you do the copy
+        //one file to another file
+        executeCommand(cmd,&isRedirect,cmdTokens,cmdTokens,&isExit,numTokens,batchmode);
     }
+    kill(getpid(),SIGUSR1);
+
 
     return 0;
 }
@@ -174,13 +181,17 @@ void changeDirectories(char *tokens[], int numTokens){
             printError();
         } 
         else{
-            chdir(tokens[1]);
+            bool exist=chdir(tokens[1]);
+            if(exist!=0)
+            {
+                printError();
+            }
         }
 }
 
 
 // not finished
-char *executeCommand(char *cmd, bool *isRedirect, char* tokens[], char* outputTokens[],  bool *isExits,int numTokens){
+char *executeCommand(char *cmd, bool *isRedirect, char* tokens[], char* outputTokens[],  bool *isExits,int numTokens,bool batch){
     char *command = strdup(cmd);
     char outFileName[STR_MAX] = "";
     strcat(command, "\n");
@@ -200,23 +211,26 @@ char *executeCommand(char *cmd, bool *isRedirect, char* tokens[], char* outputTo
     }
     else
     {
-        launchProcesses(tokens,numTokens,isRedirect);
+        launchProcesses(tokens,numTokens,isRedirect,batch);
     }
     return "outputFile.txt";
 }
 
 
-void launchProcesses(char *tokens[], int numTokens, bool isRedirect)
+void launchProcesses(char *tokens[], int numTokens, bool isRedirect, bool batch)
 {
-    if (numTokens == 1)
+    if (!batch)
     {
-        tokens[0][strlen(tokens[0])-1] = '\0';
-    }
-    else
-    {
-        for (int i=1;i<numTokens;i++)
+        if (numTokens == 1)
         {
-            tokens[i][strlen(tokens[0])] = '\0';
+            tokens[0][strlen(tokens[0])-1] = '\0';
+        }
+        else
+        {
+            for (int i=1;i<numTokens;i++)
+            {
+                tokens[i][strlen(tokens[0])] = '\0';
+            }
         }
     }
     char* args[3];
