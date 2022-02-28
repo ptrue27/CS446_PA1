@@ -167,16 +167,15 @@ bool exitProgram(char *tokens[], int numTokens)
     }
 }
 
-// should be working but havent tested yet
+// Working, test on TestDir
 void changeDirectories(char *tokens[], int numTokens){
-    if(strcmp(tokens[0], "cd") == 0){
+    tokens[1][strlen(tokens[1])-1] = '\0';
         if(numTokens != 2){
             printError();
         } 
         else{
             chdir(tokens[1]);
         }
-    }
 }
 
 
@@ -194,7 +193,15 @@ char *executeCommand(char *cmd, bool *isRedirect, char* tokens[], char* outputTo
     {
         *isRedirect = false;
     }
-    launchProcesses(tokens,numTokens,isRedirect);
+
+    if (strcmp(tokens[0],"cd\n")==0 || strcmp(tokens[0],"cd")==0)
+    {
+        changeDirectories(tokens,numTokens);
+    }
+    else
+    {
+        launchProcesses(tokens,numTokens,isRedirect);
+    }
     return "outputFile.txt";
 }
 
