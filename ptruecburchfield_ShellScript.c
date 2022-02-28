@@ -9,6 +9,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 #define STR_MAX 128 // using this because <limits.h> is not allowed
 #define TOKEN_MAX 32
@@ -45,7 +46,6 @@ int main(int argc, char *argv[])
     else if(argc == 1){
         batchmode = false;
         inputFile = stdin;
-        printf("THis is where input is");
     } 
     else{
         if(inputFile = fopen(argv[1],"r")){
@@ -77,11 +77,6 @@ int main(int argc, char *argv[])
         printHelp(cmdTokens,numTokens);
         isExit=exitProgram(cmdTokens,numTokens);
         executeCommand(cmd,&isRedirect,cmdTokens,cmdTokens,&isExit,numTokens);
-
-        // Execute command
-        // char outFileName[STR_MAX] = executeCommand(cmd, &isRedirect, char* tokens[], char* outputTokens[],  &isExit); need to figure out tokens vs. outputTokens
-            
-    
     }
 
     return 0;
@@ -187,14 +182,6 @@ void changeDirectories(char *tokens[], int numTokens){
 // not finished
 char *executeCommand(char *cmd, bool *isRedirect, char* tokens[], char* outputTokens[],  bool *isExits,int numTokens){
     char *command = strdup(cmd);
-    // strcat(command, "\n");
-    printf("%s",command);
-    // int x=0;
-    // while(command[x]!=NULL)
-    // {
-    //     x++;
-    // }
-    // command[x-1]=NULL;
     char outFileName[STR_MAX] = "";
 
     // Check if command is a redirect
@@ -207,12 +194,30 @@ char *executeCommand(char *cmd, bool *isRedirect, char* tokens[], char* outputTo
         *isRedirect = false;
     }
     launchProcesses(&command,numTokens,isRedirect);
+    return "outputFile.txt";
 }
 
 
 void launchProcesses(char *tokens[], int numTokens, bool isRedirect)
 {
     tokens[0][strlen(tokens[0])-1] = '\0';
-    // execvp("ls",argumentList);
-    execvp(tokens[0],tokens);
+    pid_t childProc;
+    int childStatus;
+    pid_t childReturn;
+    if ((childProc = fork()) == 0)
+    {
+        execvp(tokens[0],tokens);
+        exit (1);
+    }
+    else
+    {
+        if (childProc == (pid_t)(-1))
+        {
+            exit(1);
+        }
+        else
+        {
+            childReturn = wait(&childStatus);
+        }
+    }
 }
