@@ -1,2 +1,8 @@
-ls -l
-ls
+cd
+cd NotADirectory
+cd TestDir
+cd ..
+help ExtraArg
+help
+exit ExtraArg
+exit

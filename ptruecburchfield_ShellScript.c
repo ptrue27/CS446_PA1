@@ -1,57 +1,52 @@
 /*
-    CS 466 Project 1 Part 2
-    Making our own shell program in C
-    Parker True and Curtis Burchfield
-    2/25/22
+    CS 446 Project 1 Part 2
+    Program Name: ptruecburchfield_ShellScript
+    Authors: Parker True and Curtis Burchfield
+    Purpose: Create a basic shell capable of running select commands
 */
 
-#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdbool.h>
-#include <unistd.h>
+#include <stdlib.h>
 #include <sys/wait.h>
+#include <unistd.h>
+#include <stdbool.h>
 
 #define STR_MAX 128 // using this because <limits.h> is not allowed
-#define TOKEN_MAX 32
+#define TOKEN_MAX 16
 
 void promptUser(bool isBatch);
 void printError();
 int parseInput(char *input, char *splitWords[]);
 char *redirectCommand(char *special, char *line, bool *isRedirect, char *tokens[], char *outputTokens[]);
-char *executeCommand(char *cmd, bool *isRedirect, char* tokens[], char* outputTokens[],  bool *isExits,int numTokens, bool batch);
-char getLetter(char *str, int index);
-bool exitProgram(char *tokens[], int numTokens);
-void launchProcesses(char *tokens[], int numTokens, bool isRedirect,bool batch);
-void changeDirectories(char *tokens[], int numTokens);
-
+char *executeCommand(char *cmd, bool *isRedirect, char* tokens[], char* outputTokens[],  bool *isExit);
 void printHelp(char *tokens[], int numTokens);
+bool exitProgram(char *tokens[], int numTokens);
+void launchProcesses(char *tokens[], int numTokens, bool isRedirect);
+void changeDirectories(char *tokens[], int numTokens);
+char *lowerString(char *str);
 
-int main(int argc, char *argv[])
-{
-    bool batchmode, isRedirect, isExit = false;
-
-    FILE* inputFile = NULL;
-    FILE* outFile = NULL;
-    FILE* redirectFile = NULL;
-
-    char cmd[STR_MAX];
-    char* cmdTokens[TOKEN_MAX];
-    int numTokens;
-
-    // Determine if a batch file was inputed with command line arguements
-    if(argc > 2){
+int main(int argc, char *argv[]){
+    // Error: too many command line arguments
+    if (argc > 2){
         printError();
         return 1;
-    } 
-    else if(argc == 1){
+    }
+
+    bool batchmode, isRedirect, isExit = false;
+    FILE *inputFile = NULL, *outFile = NULL, *redirectFile = NULL;
+    char *cmd, *cmdTokens[STR_MAX], *outFileName;
+    int numTokens;
+
+    // Initialize input stream
+    if (argc == 1){
         batchmode = false;
         inputFile = stdin;
-    } 
+    }
     else{
         if(inputFile = fopen(argv[1],"r")){
             batchmode = true;
-        } 
+        }
         else{
             printError();
             return 1;
@@ -61,171 +56,159 @@ int main(int argc, char *argv[])
     // Shell loop
     while(!isExit)
     {
+        // Print command prompt if in user mode        
         promptUser(batchmode);
 
         // Get cmd string from input, exit program if end of batchfile
         if(fgets(cmd, STR_MAX, inputFile) == NULL){
-            // exitProgram();
+            isExit = true;
             break;
-            //For some reason I couldn't figure out, it only can handle two commands in the batch file.
-            //Sorry I couldn't get this figured out. You are welcome ot take a crack at it if youd like.
-            //I think maybe it has to do with it putting all commands in the file at once instead of line by line.
         }
-        //This just displays whats in the file I believe
+        if(cmd[strlen(cmd)-1] == '\n'){
+            cmd[strlen(cmd)-1] = '\0';
+        }
+
+        // Display command if read from batchfile
         if(batchmode){
             puts(cmd);
         }
 
         // Parse cmd string into tokens
-        numTokens = parseInput(cmd, cmdTokens);
+        // Issue: this adds null characters between words in cmd so when passing to executeCommand() cmd only gives first word
+        // As of right now it still works without this but according to the directions for main() its supposed to go here
+        //numTokens = parseInput(cmd, cmdTokens);
         
-        printHelp(cmdTokens,numTokens);
-        isExit=exitProgram(cmdTokens,numTokens);
+        // Execute command stored in cmd string
+        outFileName = executeCommand(cmd,&isRedirect,cmdTokens,cmdTokens,&isExit);
 
-        //This returns the file name for the special case if you do the copy
-        //one file to another file
-        executeCommand(cmd,&isRedirect,cmdTokens,cmdTokens,&isExit,numTokens,batchmode);
-        // if (batchmode)
-        // {
-        //     break;
-        // }
+        // Handle redirect if applicable
+        if(isRedirect){
+            // not implemented yet
+        }
     }
-    kill(getpid(),SIGUSR1);
 
+    // I'm not quite sure what this is doing but I'm guessing something to do with launchProcesses() which I have not looked at
+    //kill(getpid(),SIGUSR1);
 
     return 0;
 }
-            // exitShell = exitProgram(splitWords,splitWordsIndex);
-            // printHelp(splitWords,splitWordsIndex);
 
-//-------------------------------------------------------------------------
-void promptUser(bool batchmode)
-{
+// Prints command prompt to terminal
+void promptUser(bool batchmode){
     if(!batchmode){
-        // print user
+        // Print user
         printf("%s", getenv("USER"));
-        // print machine
+        // Print machine
         char hostname[STR_MAX];
         gethostname(hostname, sizeof(hostname));
         printf("@%s", hostname);
-        // print cwd
+        // Print cwd
         char cwd[STR_MAX];
         getcwd(cwd, sizeof(cwd));
         printf(":%s$ ", cwd);
     }
 }
 
-//-------------------------------------------------------------------------
-void printError()
-{
+// Prints error message to terminal
+void printError(){
     printf("\nShell Program Error Encountered\n\n");
 }
 
-//-------------------------------------------------------------------------
-//This confused me, all it does is chop up the input string into different words
+// Splits input string into tokens
 int parseInput(char *input, char *splitWords[]){
     int wordInd = 0;
     splitWords[0] = strtok(input, " ");
-    while(splitWords[wordInd] != NULL)
-    {
-        // printf(" %s\n",splitWords[wordInd]);//This is it displaying each word, kind of confusing
+    while (splitWords[wordInd] != NULL){
         splitWords[++wordInd] = strtok(NULL, " ");
     }
-    // for (int i=0;i<wordInd;i++)
-    // {
-    //     printf("%s",splitWords[i]);
-    // }
+    //for(int i=0;i<wordInd;i++){printf("%s|",splitWords[i]);}
     return wordInd;
 }
 
-//-------------------------------------------------------------------------
-void printHelp(char *tokens[], int numTokens)
-{
-    if (strcmp(tokens[0],"help\n")==0 || strcmp(tokens[0],"Help\n")==0 || strcmp(tokens[0],"HELP\n")==0 || strcmp(tokens[0],"HELP")==0 || strcmp(tokens[0],"Help")==0 || strcmp(tokens[0],"help")==0)
-    {
-        if (numTokens > 1)
-        {
+// Prints help screen upon 'HELP' command
+void printHelp(char *tokens[], int numTokens){
+    if (strcmp(lowerString(tokens[0]),"help") == 0){
+        if (numTokens > 1){
             printError();
-            printf("\nHelp command with other arguement\n\n");
         }
-        else
-        {
+        else{
             printf("\n\nhelp -prints this screen so you can see available shell commands.");
             printf("\ncd -changes directories to specified path;if not given, defaults to home.");
             printf("\nexit -closes the shell");
             printf("\n[input] > [output] -pipes input file into output file");
-            printf("\nls -see all available files in current directory");
+            printf("\nls -see all available files in current directory\n\n");
         }
     }
 }
 
-//-------------------------------------------------------------------------
-bool exitProgram(char *tokens[], int numTokens)
-{
-    if (strcmp(tokens[0],"exit\n")==0 || strcmp(tokens[0],"Exit\n")==0 || strcmp(tokens[0],"EXIT\n")==0 || strcmp(tokens[0],"exit")==0 || strcmp(tokens[0],"Exit")==0 || strcmp(tokens[0],"EXIT")==0)
-    {
-        if (numTokens > 1)
-        {
+// Returns true upon 'EXIT' command
+bool exitProgram(char *tokens[STR_MAX], int numTokens){
+    if (strcmp(lowerString(tokens[0]),"exit") == 0){
+        if (numTokens > 1){
             printError();
-            printf("\nExit command with other arguement\n\n");
             return false;
         }
-        else
-        {
-            return true;
-        }
+        return true;
     }
-    else
-    {
-        return false;
-    }
+    return false;
 }
 
-// Working, test on TestDir
-void changeDirectories(char *tokens[], int numTokens){
-    tokens[1][strlen(tokens[1])-1] = '\0';
-        if(numTokens != 2){
+// Changes current working directory upon 'CD' command
+void changeDirectories(char *tokens[STR_MAX], int numTokens){
+    if (strcmp(lowerString(tokens[0]), "cd") == 0){
+        if (numTokens != 2){
             printError();
-        } 
+        }
         else{
-            bool exist=chdir(tokens[1]);
-            if(exist!=0)
-            {
+            tokens[1][strlen(tokens[1])-1] = '\0';
+            if (chdir(tokens[1]) == -1){
                 printError();
             }
         }
+    }
 }
 
 
-// not finished
-char *executeCommand(char *cmd, bool *isRedirect, char* tokens[], char* outputTokens[],  bool *isExits,int numTokens,bool batch){
-    char *command = strdup(cmd);
-    char outFileName[STR_MAX] = "";
-    strcat(command, "\n");
-    // Check if command is a redirect
-    if(strchr(command, '>') != NULL){
+// Handles execution of one command, returns output file name
+char *executeCommand(char *cmd, bool *isRedirect, char *tokens[STR_MAX], char *outputTokens[STR_MAX], bool *isExit){
+    char *cmdCopy = strdup(cmd), *outFileName = "";
+    strcat(cmdCopy, "\n");
+
+    // Check for then execute redirect command
+    if (strchr(cmdCopy, '>') != NULL){
         *isRedirect = true;
         // return redirectCommand();
     }
-    else
-    {
-        *isRedirect = false;
+
+    // Parse command, return if no tokens created
+    *isRedirect = false;
+    int numTokens = parseInput(cmdCopy, outputTokens);
+    if (numTokens == 0){
+        return outFileName;
     }
 
-    if (strcmp(tokens[0],"cd\n")==0 || strcmp(tokens[0],"cd")==0)
-    {
-        changeDirectories(tokens,numTokens);
+    // Exit if 'EXIT' command is given
+    *isExit = exitProgram(outputTokens, numTokens);
+    if(*isExit){
+        return outFileName;
     }
-    else
-    {
-        launchProcesses(tokens,numTokens,isRedirect,batch);
-    }
-    return "outputFile.txt";
+
+    // Change directories if 'CD' command is given
+    changeDirectories(outputTokens, numTokens);
+
+    // Print help screen if 'HELP' command is given
+    printHelp(outputTokens, numTokens);
+
+    // Executes execvp command if given
+    //launchProcesses(tokens, numTokens, isRedirect);
+
+    free(cmdCopy);
+    return outFileName;
 }
 
-
-void launchProcesses(char *tokens[], int numTokens, bool isRedirect, bool batch)
-{
+// needs redoing
+/*
+void launchProcesses(char *tokens[], int numTokens, bool isRedirect){
     if (!batch)
     {
         if (numTokens == 1)
@@ -279,4 +262,19 @@ void launchProcesses(char *tokens[], int numTokens, bool isRedirect, bool batch)
             childReturn = wait(&childStatus);
         }
     }
+}
+*/
+
+// Lowers case of all letters and removes newline if it exists
+char *lowerString(char *str){
+    int i;
+    for(i = 0; str[i] != '\0'; i++){
+      if(str[i] >= 65 && str[i] <= 90){
+         str[i] = str[i] + 32;
+      }
+   }
+   if(str[i-1] == '\n'){
+       str[i-1] = '\0';
+   }
+   return str;
 }
