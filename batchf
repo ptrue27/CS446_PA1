@@ -1,6 +1,7 @@
 cd
 cd NotADirectory
 cd TestDir
+ls
 cd ..
 help ExtraArg
 help

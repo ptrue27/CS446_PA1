@@ -26,7 +26,11 @@ void launchProcesses(char *tokens[], int numTokens, bool isRedirect);
 void changeDirectories(char *tokens[], int numTokens);
 char *lowerString(char *str);
 
+void fixString(char * tokens[], int numTokens);
+
 int main(int argc, char *argv[]){
+    int bCommands =0;
+    char * result;
     // Error: too many command line arguments
     if (argc > 2){
         printError();
@@ -35,7 +39,7 @@ int main(int argc, char *argv[]){
 
     bool batchmode, isRedirect, isExit = false;
     FILE *inputFile = NULL, *outFile = NULL, *redirectFile = NULL;
-    char *cmd, *cmdTokens[STR_MAX], *outFileName;
+    char *cmd, *cmdTokens[STR_MAX], *outputTokens[STR_MAX], *outFileName;
     int numTokens;
 
     // Initialize input stream
@@ -53,40 +57,56 @@ int main(int argc, char *argv[]){
         }
     }
     
-    // Shell loop
-    while(!isExit)
-    {
-        // Print command prompt if in user mode        
-        promptUser(batchmode);
+    
+    // if (batchmode)
+    // {
+    //     printf("\nBatch\n");
+    //     size_t length;
+    //     ssize_t reading;
+    //     //reads in batch file line by line, in the loop need to add executing the command
+    //     while ((reading = getline(&cmd,&length, inputFile)) != -1)
+    //     {
+    //         // outFileName = executeCommand(cmd,&isRedirect,cmdTokens,cmdTokens,&isExit);
+    //         // printf("%s\n",cmd);
+    //         printf("%s\n",cmd);
 
-        // Get cmd string from input, exit program if end of batchfile
-        if(fgets(cmd, STR_MAX, inputFile) == NULL){
-            isExit = true;
-            break;
-        }
-        if(cmd[strlen(cmd)-1] == '\n'){
-            cmd[strlen(cmd)-1] = '\0';
-        }
-
-        // Display command if read from batchfile
-        if(batchmode){
-            puts(cmd);
-        }
-
-        // Parse cmd string into tokens
-        // Issue: this adds null characters between words in cmd so when passing to executeCommand() cmd only gives first word
-        // As of right now it still works without this but according to the directions for main() its supposed to go here
-        //numTokens = parseInput(cmd, cmdTokens);
+    //     }
         
-        // Execute command stored in cmd string
-        outFileName = executeCommand(cmd,&isRedirect,cmdTokens,cmdTokens,&isExit);
 
-        // Handle redirect if applicable
-        if(isRedirect){
-            // not implemented yet
+
+    // }
+    // else
+    // {
+        // Shell loop
+        while(!isExit)
+        {
+            // Print command prompt if in user mode        
+            promptUser(batchmode);
+            // Get cmd string from input, exit program if end of batchfile
+            if(fgets(cmd, STR_MAX, inputFile) == NULL)
+            {
+                isExit=true;
+            }
+            // result = fgets(cmd, STR_MAX, inputFile);
+            if(cmd[strlen(cmd)-1] == '\n'){
+                cmd[strlen(cmd)-1] = '\0';
+            }
+            if(batchmode){
+                printf(">");
+                puts(cmd);
+                bCommands++;
+            }
+
+            // Parse cmd string into tokens
+            // Issue: this adds null characters between words in cmd so when passing to executeCommand() cmd only gives first word
+            // As of right now it still works without this but according to the directions for main() its supposed to go here
+            //numTokens = parseInput(cmd, cmdTokens);
+            
+            // Execute command stored in cmd string
+            outFileName = executeCommand(cmd,&isRedirect,cmdTokens,cmdTokens,&isExit);
         }
-    }
-
+    // }
+    printf("\nNumber of batch commands: %d\n",bCommands);
     // I'm not quite sure what this is doing but I'm guessing something to do with launchProcesses() which I have not looked at
     //kill(getpid(),SIGUSR1);
 
@@ -121,7 +141,6 @@ int parseInput(char *input, char *splitWords[]){
     while (splitWords[wordInd] != NULL){
         splitWords[++wordInd] = strtok(NULL, " ");
     }
-    //for(int i=0;i<wordInd;i++){printf("%s|",splitWords[i]);}
     return wordInd;
 }
 
@@ -132,7 +151,7 @@ void printHelp(char *tokens[], int numTokens){
             printError();
         }
         else{
-            printf("\n\nhelp -prints this screen so you can see available shell commands.");
+            printf("\nhelp -prints this screen so you can see available shell commands.");
             printf("\ncd -changes directories to specified path;if not given, defaults to home.");
             printf("\nexit -closes the shell");
             printf("\n[input] > [output] -pipes input file into output file");
@@ -173,16 +192,17 @@ void changeDirectories(char *tokens[STR_MAX], int numTokens){
 char *executeCommand(char *cmd, bool *isRedirect, char *tokens[STR_MAX], char *outputTokens[STR_MAX], bool *isExit){
     char *cmdCopy = strdup(cmd), *outFileName = "";
     strcat(cmdCopy, "\n");
-
+    
     // Check for then execute redirect command
     if (strchr(cmdCopy, '>') != NULL){
         *isRedirect = true;
-        // return redirectCommand();
+        return redirectCommand(">","uh",isRedirect,tokens,outputTokens);
     }
+    int numTokens = parseInput(cmdCopy, outputTokens);
 
     // Parse command, return if no tokens created
     *isRedirect = false;
-    int numTokens = parseInput(cmdCopy, outputTokens);
+
     if (numTokens == 0){
         return outFileName;
     }
@@ -200,61 +220,31 @@ char *executeCommand(char *cmd, bool *isRedirect, char *tokens[STR_MAX], char *o
     printHelp(outputTokens, numTokens);
 
     // Executes execvp command if given
-    //launchProcesses(tokens, numTokens, isRedirect);
+    fixString(tokens,numTokens);
+    launchProcesses(tokens, numTokens, isRedirect);
 
     free(cmdCopy);
     return outFileName;
 }
 
 // needs redoing
-/*
-void launchProcesses(char *tokens[], int numTokens, bool isRedirect){
-    if (!batch)
-    {
-        if (numTokens == 1)
-        {
-            tokens[0][strlen(tokens[0])-1] = '\0';
-        }
-        else
-        {
-            for (int i=1;i<numTokens;i++)
-            {
-                tokens[i][strlen(tokens[i])-1] = '\0';
-            }
-        }
-    }
-    else
-    {
-        if (numTokens==1)
-        {
-            // tokens[0][strlen(tokens[0])-1] = '\0';
-        }
-        else
-        {
-            for (int i=1;i<numTokens;i++)
-            {
-                tokens[i][strlen(tokens[i])-1] = '\0';
-            }  
-        }
-    }
-    char* args[3];
-    args[0]="ls";
-    args[1]="-l";
-    args[2]=NULL;
-    
-    // tokens[0][strlen(tokens[0])-1] = '\0';
+
+void launchProcesses(char *tokens[], int numTokens, bool isRedirect)
+{
     pid_t childProc;
     int childStatus;
     pid_t childReturn;
     if ((childProc = fork()) == 0)
     {
         execvp(tokens[0],tokens);
+        // printError();
         exit (1);
     }
     else
     {
         if (childProc == (pid_t)(-1))
         {
+            // printError();
             exit(1);
         }
         else
@@ -263,7 +253,6 @@ void launchProcesses(char *tokens[], int numTokens, bool isRedirect){
         }
     }
 }
-*/
 
 // Lowers case of all letters and removes newline if it exists
 char *lowerString(char *str){
@@ -277,4 +266,75 @@ char *lowerString(char *str){
        str[i-1] = '\0';
    }
    return str;
+}
+
+void fixString(char * tokens[], int numTokens)
+{
+    for (int j=0;j<numTokens;j++)
+    {
+        for (int i=0;i<100;i++)
+        {
+            if (tokens[j][i]=='\n')
+            {
+                tokens[j][i]= '\0';
+                break;
+            }
+        }
+    }
+}
+
+char *redirectCommand(char *special, char *line, bool *isRedirect, char *tokens[], char *outputTokens[])
+{
+    
+    //Super janky, but it gets both the file names from the input
+    int i = 0,f = 0, j=0;
+    int readWords=0;
+    char inputFileName[STR_MAX];
+    char outputFileName[STR_MAX];
+    i=0;
+    f=0;
+    j=0;
+    while(readWords!=2)
+    {
+        for(j=0; tokens[0][j] != '\0'; ++j)
+        {
+            if (readWords==0)
+            {
+                inputFileName[i]=tokens[0][j];
+                i++;
+            }
+            if (readWords==2)
+            {
+                outputFileName[f]=tokens[0][j];
+                f++;
+            }
+            if (tokens[0][j]==' ')
+            {
+                readWords++;
+            }
+            
+        }
+    }
+    inputFileName[i-1]='\0';
+    outputFileName[f-1]='\0';
+
+    //File copying
+    char CHAR;
+    FILE* inputFile, *outputFile;
+    inputFile = fopen(inputFileName,"r");
+    if (inputFile==NULL)
+    {
+        printError();
+        return outputFileName;
+    }
+    outputFile = fopen(outputFileName,"w");
+    while ((CHAR = fgetc(inputFile)) != EOF)
+    {
+        fputc(CHAR, outputFile);
+    }
+    fclose (inputFile);
+    fclose (outputFile);
+    printf("\nSuccessfully Copied\nOutput File Name: %s\n",outputFileName);
+    return outputFileName;
+
 }
