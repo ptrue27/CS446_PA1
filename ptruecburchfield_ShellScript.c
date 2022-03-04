@@ -29,8 +29,7 @@ char *lowerString(char *str);
 void fixString(char * tokens[], int numTokens);
 
 int main(int argc, char *argv[]){
-    int bCommands =0;
-    char * result;
+
     // Error: too many command line arguments
     if (argc > 2){
         printError();
@@ -41,7 +40,10 @@ int main(int argc, char *argv[]){
     FILE *inputFile = NULL, *outFile = NULL, *redirectFile = NULL;
     char *cmd, *cmdTokens[STR_MAX], *outputTokens[STR_MAX], *outFileName;
     int numTokens;
-
+    int batchLines =0;
+    int lineNum = 0;
+    int bCommands =0;
+    char *lastLine;
     // Initialize input stream
     if (argc == 1){
         batchmode = false;
@@ -56,55 +58,125 @@ int main(int argc, char *argv[]){
             return 1;
         }
     }
-    
-    
-    // if (batchmode)
-    // {
-    //     printf("\nBatch\n");
-    //     size_t length;
-    //     ssize_t reading;
-    //     //reads in batch file line by line, in the loop need to add executing the command
-    //     while ((reading = getline(&cmd,&length, inputFile)) != -1)
-    //     {
-    //         // outFileName = executeCommand(cmd,&isRedirect,cmdTokens,cmdTokens,&isExit);
-    //         // printf("%s\n",cmd);
-    //         printf("%s\n",cmd);
-
-    //     }
-        
-
-
-    // }
-    // else
-    // {
-        // Shell loop
-        while(!isExit)
+    if (batchmode)
+    {
+        FILE* testFile = fopen(argv[1],"r");
+        char testChar;
+        if (testFile==NULL)
         {
-            // Print command prompt if in user mode        
-            promptUser(batchmode);
-            // Get cmd string from input, exit program if end of batchfile
-            if(fgets(cmd, STR_MAX, inputFile) == NULL)
+            printError();
+        }
+        else
+        {
+            for (testChar = getc(testFile);testChar != EOF; testChar = getc(testFile))
             {
+                if (testChar=='\n')
+                {
+                    batchLines++;
+                }
+            }
+        }
+        printf("\n---Batch Lines: %d---\n",batchLines);
+        fclose(testFile);
+        FILE* testFile2 = fopen(argv[1],"r");
+        bool skip=true;
+        int index =0;
+        if (testFile2==NULL)
+        {
+            printError();
+        }
+        else
+        {
+            for (testChar = getc(testFile2);testChar != EOF; testChar = getc(testFile2))
+            {
+                if (testChar=='\n')
+                {
+                    lineNum++;
+                }
+                if (lineNum==batchLines)
+                {
+                    if(!skip && batchLines>0)
+                    {
+                    lastLine[index]=testChar;
+                    index++;
+                    }
+                    skip=false;
+                }
+            }
+        }
+        fclose(testFile2);
+        lastLine[index]='\0';
+        for (int a=index+1;a<40;a++)
+        {
+            lastLine[a]='\0';
+        }
+    }
+    // Shell loop
+    while(!isExit)
+    {
+        // Print command prompt if in user mode        
+        promptUser(batchmode);
+
+        if (!batchmode)
+        {
+            for (int f = 0; f < STR_MAX; f++)
+            {
+                cmd[f]='\0';
+            }
+        }
+        // Get cmd string from input, exit program if end of batchfile
+        if(fgets(cmd, STR_MAX, inputFile) == NULL)
+        {
+            isExit=true;
+        }
+        if (bCommands == batchLines && batchmode)
+        {
+            int x=0;
+            for (int l=0;lastLine[l]!='\0';l++)
+            {
+                cmd[l]=lastLine[l];
+                x++;
+            }
+            if(batchLines!=0)
+            {
+                cmd[x]='\0';
+            }
+            else
+            {
+
+            }
+            printf("---%s---",cmd);
+        }
+        if(cmd[strlen(cmd)-1] == '\n'){
+            cmd[strlen(cmd)-1] = '\0';
+        }
+        if(batchmode){
+            printf(">");
+            puts(cmd);
+        }
+
+        // Parse cmd string into tokens
+        // Issue: this adds null characters between words in cmd so when passing to executeCommand() cmd only gives first word
+        // As of right now it still works without this but according to the directions for main() its supposed to go here
+        //numTokens = parseInput(cmd, cmdTokens);
+        
+        // Execute command stored in cmd string
+        outFileName = executeCommand(cmd,&isRedirect,cmdTokens,cmdTokens,&isExit);
+        
+        if (batchmode)
+        {
+            bCommands++;
+            if (bCommands > batchLines)
+            {
+                // printf("\n----------------------------\n%s\n------------------------------\n",cmd);
                 isExit=true;
             }
-            // result = fgets(cmd, STR_MAX, inputFile);
-            if(cmd[strlen(cmd)-1] == '\n'){
-                cmd[strlen(cmd)-1] = '\0';
+            else
+            {
+                isExit=false;
             }
-            if(batchmode){
-                printf(">");
-                puts(cmd);
-                bCommands++;
-            }
-
-            // Parse cmd string into tokens
-            // Issue: this adds null characters between words in cmd so when passing to executeCommand() cmd only gives first word
-            // As of right now it still works without this but according to the directions for main() its supposed to go here
-            //numTokens = parseInput(cmd, cmdTokens);
-            
-            // Execute command stored in cmd string
-            outFileName = executeCommand(cmd,&isRedirect,cmdTokens,cmdTokens,&isExit);
         }
+    }
     // }
     printf("\nNumber of batch commands: %d\n",bCommands);
     // I'm not quite sure what this is doing but I'm guessing something to do with launchProcesses() which I have not looked at
@@ -222,7 +294,6 @@ char *executeCommand(char *cmd, bool *isRedirect, char *tokens[STR_MAX], char *o
     // Executes execvp command if given
     fixString(tokens,numTokens);
     launchProcesses(tokens, numTokens, isRedirect);
-
     free(cmdCopy);
     return outFileName;
 }
@@ -234,6 +305,7 @@ void launchProcesses(char *tokens[], int numTokens, bool isRedirect)
     pid_t childProc;
     int childStatus;
     pid_t childReturn;
+    
     if ((childProc = fork()) == 0)
     {
         execvp(tokens[0],tokens);
@@ -252,7 +324,9 @@ void launchProcesses(char *tokens[], int numTokens, bool isRedirect)
             childReturn = wait(&childStatus);
         }
     }
+
 }
+
 
 // Lowers case of all letters and removes newline if it exists
 char *lowerString(char *str){
